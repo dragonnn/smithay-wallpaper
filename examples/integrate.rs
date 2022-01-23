@@ -32,6 +32,7 @@ fn main() -> Result<()> {
     let (mut backend, mut input) = winit::init(None)?;
     // create an `EguiState`. Usually this would be part of your global smithay state
     let mut wallpaper = WallpaperState::new();
+    wallpaper.set("bg.png");
     // this is likely already part of your ui-state for `send_frames` and similar
     let start_time = std::time::Instant::now();
     // We need to track the current set of modifiers, because egui expects them to be passed for many events
