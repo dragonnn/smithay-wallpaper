@@ -27,10 +27,6 @@ use std::{
     },
 };
 
-mod rendering;
-mod types;
-pub use self::types::{convert_button, convert_key, convert_modifiers};
-
 #[cfg(feature = "render_element")]
 static EGUI_ID: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "render_element")]
@@ -58,7 +54,6 @@ pub struct WallpaperState {
 /// A single rendered egui interface frame
 pub struct WallpaperFrame {
     state_id: usize,
-    scale: f64,
     area: Rectangle<i32, Physical>,
     size: Size<i32, Physical>,
 }
@@ -68,84 +63,56 @@ impl WallpaperState {
     pub fn new() -> Self {
         Self { id: next_id() }
     }
+
+    /// Produce a new frame of egui to draw onto your output buffer.
+    ///
+    /// - `ui` is your drawing function
+    /// - `area` limits the space egui will be using.
+    /// - `size` has to be the total size of the buffer the ui will be displayed in
+    /// - `scale` is the scale egui should render in
+    /// - `start_time` need to be a fixed point in time before the first `run` call to measure animation-times and the like.
+    /// - `modifiers` should be the current state of modifiers pressed on the keyboards.
+    pub fn run(
+        &mut self,
+        area: Rectangle<i32, Logical>,
+        size: Size<i32, Physical>,
+    ) -> WallpaperFrame {
+        let area = area.to_physical(1);
+        WallpaperFrame {
+            state_id: self.id,
+            area,
+            size,
+        }
+    }
 }
 
-impl EguiFrame {
+impl WallpaperFrame {
     /// Draw this frame in the currently active GL-context
     pub unsafe fn draw(&self, r: &mut Gles2Renderer, frame: &Gles2Frame) -> Result<(), Gles2Error> {
-        use rendering::GlState;
-
-        let user_data = r.egl_context().user_data();
-        if user_data.get::<GlState>().is_none() {
-            let state = GlState::new(r, self.ctx.font_image())?;
-            r.egl_context().user_data().insert_if_missing(|| state);
-        }
-
         r.with_context(|r, gl| unsafe {
-            let state = r.egl_context().user_data().get::<GlState>().unwrap();
             let transform = frame.transformation();
 
-            state.paint_meshes(
-                frame,
-                gl,
-                self.size,
-                self.scale,
-                self.mesh
-                    .clone()
-                    .into_iter()
-                    .map(|ClippedMesh(rect, mesh)| {
-                        let rect = Rectangle::<f64, Physical>::from_extemities(
-                            (rect.min.x as f64, rect.min.y as f64),
-                            (rect.max.x as f64, rect.max.y as f64),
-                        );
-                        let rect = transform.transform_rect_in(rect, &self.size.to_f64());
-                        ClippedMesh(
-                            Rect {
-                                min: (rect.loc.x as f32, rect.loc.y as f32).into(),
-                                max: (
-                                    (rect.loc.x + rect.size.w) as f32,
-                                    (rect.loc.y + rect.size.h) as f32,
-                                )
-                                    .into(),
-                            },
-                            mesh,
-                        )
-                    }),
-                self.alpha,
-            )
+            Ok(())
         })
         .and_then(std::convert::identity)
     }
 }
 
 #[cfg(feature = "render_element")]
-impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for EguiFrame {
+impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for WallpaperFrame {
     fn id(&self) -> usize {
         self.state_id
     }
 
     fn geometry(&self) -> Rectangle<i32, Logical> {
-        let area = self.area.to_f64();
-
-        let used = self.ctx.used_rect();
-        Rectangle::<f64, Physical>::from_extemities(
-            Point::<f64, Physical>::from((used.min.x as f64 - 30.0, used.min.y as f64 - 30.0))
-                + area.loc,
-            (used.max.x as f64 + 30.0, used.max.y as f64 + 30.0),
-        )
-        .to_logical(self.scale)
-        .to_i32_round()
+        Rectangle::<i32, Logical>::from_loc_and_size((0, 0), (0, 0))
     }
 
     fn accumulated_damage(
         &self,
         _for_values: Option<SpaceOutputTuple<'_, '_>>,
     ) -> Vec<Rectangle<i32, Logical>> {
-        if self.output.needs_repaint {
-            vec![self.geometry()]
-        } else {
-            vec![]
-        }
+        vec![]
     }
 
     fn draw(
@@ -156,7 +123,7 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Egui
         _damage: &[Rectangle<i32, Logical>],
         log: &slog::Logger,
     ) -> Result<(), Gles2Error> {
-        if let Err(err) = unsafe { EguiFrame::draw(self, renderer, frame) } {
+        if let Err(err) = unsafe { WallpaperFrame::draw(self, renderer, frame) } {
             slog::error!(log, "egui rendering error: {}", err);
         }
         Ok(())
