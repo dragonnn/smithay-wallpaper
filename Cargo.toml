@@ -1,0 +1,38 @@
+[package]
+name = "smithay-wallpaper"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+image = { version = "0.23.14", default-features = false, optional = true, features = ["png",] }
+lazy_static = { version = "1.4.0", optional = true }
+slog = { version = "2.7.0", optional = true }
+
+[dependencies.smithay]
+#version = "0.3"
+#git = "https://github.com/Smithay/smithay.git"
+#branch = "feature/egl_userdata"
+path = "../smithay"
+default-features = false
+features = ["renderer_gl"]
+
+[features]
+default = ["render_element", "async_loading"]
+render_element = ["smithay/desktop", "lazy_static", "slog"]
+async_loading = []
+
+[dev-dependencies]
+anyhow = "1.0"
+slog = "2.7"
+slog-term = "2.8"
+slog-scope = "4.4"
+slog-stdlog = "4.1"
+
+[dev-dependencies.smithay]
+version = "0.3"
+#git = "https://github.com/Smithay/smithay.git"
+#branch = "feature/egl_userdata"
+path = "../smithay"
+default-features = false
+features = ["renderer_gl", "backend_winit", "slog-stdlog"]
